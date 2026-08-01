@@ -1,0 +1,16 @@
+admin
+api
+assets
+blog
+docs
+forum
+images
+login
+panel
+portal
+staff
+static
+support
+upload
+v1
+wp-admin
