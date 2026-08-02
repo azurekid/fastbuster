@@ -220,3 +220,5 @@ __marimo__/
 # fastbuster packaging artifacts
 dist/
 *.deb
+
+block-deb-artifacts.yml
