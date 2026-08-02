@@ -1,13 +1,13 @@
 Package: fastbuster
-Version: 0.1.2
+Version: 0.1.1
 Architecture: all
 Maintainer: fastbuster maintainers
 Depends: python3, python3-aiohttp, python3-uvloop
-Filename: ./fastbuster_0.1.2_all.deb
-Size: 26844
-MD5sum: e975f812b7889d4081ec0914990dc875
-SHA1: ff8e0a16a38c8081040a031d60d79c7784564648
-SHA256: 217941cedf229f3012bc67542b8b6e1a6c97d92e419b3aa100928bd24e180fe0
+Filename: ./fastbuster_0.1.1_all.deb
+Size: 26856
+MD5sum: 7db7c0f92f1a70d65a9521b9184fde69
+SHA1: a7cafd1c01d5e505defa575094a62e0c16c5b8d8
+SHA256: 6ae5ba86bbc51c55dd5c3f797540a369139fd087191e92c18d4eb998bca04a95
 Section: net
 Priority: optional
 Description: High-speed wordlist-driven web path scanner
