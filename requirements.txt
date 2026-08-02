@@ -1,2 +1,3 @@
 aiohttp>=3.10.0
 uvloop>=0.20.0; platform_system != "Windows"
+argcomplete>=3.0.0

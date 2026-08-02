@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# PYTHON_ARGCOMPLETE_OK
 """High-speed, wordlist-driven web path scanner for authorized testing."""
 
 from __future__ import annotations
@@ -20,7 +21,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Set, Tuple
 
-import aiohttp
+from fastbusterlib.cli import build_parser, print_startup_screen
+
+try:
+    import aiohttp
+except ModuleNotFoundError:
+    aiohttp = None  # type: ignore[assignment]
 
 
 def try_install_uvloop(disabled: bool) -> None:
@@ -301,14 +307,21 @@ def build_default_headers() -> Dict[str, str]:
     }
 
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+]
+
+
 def pick_user_agent() -> str:
-    uas = [
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
-    ]
-    return random.choice(uas)
+    return random.choice(USER_AGENTS)
 
 
 def normalize_base_url(url: str) -> str:
@@ -316,6 +329,43 @@ def normalize_base_url(url: str) -> str:
     if not url.startswith(("http://", "https://")):
         url = "http://" + url
     return url.rstrip("/")
+
+
+def ensure_aiohttp_available() -> None:
+    if aiohttp is None:
+        raise ModuleNotFoundError(
+            "No module named 'aiohttp'. Install runtime dependencies with:\n"
+            "  sudo apt install -y python3-aiohttp python3-uvloop"
+        )
+
+
+async def check_host_reachable(
+    session: aiohttp.ClientSession,
+    base_url: str,
+    timeout: float,
+    method: str,
+    follow_redirects: bool,
+) -> bool:
+    probe_method = "HEAD" if method == "GET" else method
+    try:
+        async with session.request(
+            probe_method,
+            base_url,
+            timeout=aiohttp.ClientTimeout(total=timeout),
+            allow_redirects=follow_redirects,
+            headers=build_default_headers(),
+        ) as resp:
+            if resp.status in {405, 501} and probe_method == "HEAD":
+                async with session.get(
+                    base_url,
+                    timeout=aiohttp.ClientTimeout(total=timeout),
+                    allow_redirects=follow_redirects,
+                    headers=build_default_headers(),
+                ) as fallback_resp:
+                    return fallback_resp.status < 500
+            return resp.status < 500 or resp.status in {405, 501}
+    except Exception:
+        return False
 
 
 async def fetch_robots_lines(session: aiohttp.ClientSession, base_url: str, timeout: float) -> List[str]:
@@ -470,7 +520,8 @@ async def fetch_once(
             req_timeout = aiohttp.ClientTimeout(total=timeout)
             request_headers = dict(headers or build_default_headers())
             request_headers.update({k: v for k, v in build_default_headers().items() if k not in request_headers})
-            request_headers["User-Agent"] = pick_user_agent()
+            # Rotate a random valid UA per request unless the caller pinned one.
+            request_headers.setdefault("User-Agent", pick_user_agent())
 
             async with session.request(
                 method,
@@ -502,7 +553,7 @@ async def detect_wildcard_signatures(
 ) -> Set[str]:
     signatures: Set[str] = set()
     for _ in range(max(1, samples)):
-        rand_path = f"__pybuster_{secrets.token_hex(12)}__"
+        rand_path = f"__fastbuster_{secrets.token_hex(12)}__"
         target = f"{base_url}/{rand_path}"
         status, length, sig, err, _ = await fetch_once(
             session=session,
@@ -707,46 +758,8 @@ async def shutdown_tasks(
         await asyncio.gather(*all_tasks, return_exceptions=True)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Blazing-fast wordlist web path scanner.")
-    p.add_argument("--url", required=True, help="Base target URL (e.g., https://example.com)")
-    p.add_argument("--wordlist", required=True, help="Path to wordlist (.txt or .gz)")
-    p.add_argument("--concurrency", type=int, default=400, help="Max async workers")
-    p.add_argument("--queue-size", type=int, default=20000, help="In-memory candidate queue limit")
-    p.add_argument("--timeout", type=float, default=6.0, help="HTTP timeout per request (seconds)")
-    p.add_argument("--method", choices=["GET", "HEAD"], default="GET", help="HTTP method")
-    p.add_argument("--rate", type=float, default=0.0, help="Global max requests/sec (0 disables)")
-    p.add_argument("--retries", type=int, default=1, help="Retry count per request")
-    p.add_argument("--status-allow", default="200,204,301-308,401,403", help="Allowed status codes")
-    p.add_argument("--status-deny", default=None, help="Denied status codes")
-    p.add_argument("--min-size", type=int, default=None, help="Minimum body length")
-    p.add_argument("--max-size", type=int, default=None, help="Maximum body length")
-    p.add_argument("--extensions", default="", help="Comma-separated extensions (php,txt,bak)")
-    p.add_argument("--append-slash", action="store_true", help="Also test path with trailing slash")
-    p.add_argument("--follow-redirects", action="store_true", help="Follow redirects")
-    p.add_argument("--header", action="append", default=[], help="Custom header: 'Key: Value'")
-    p.add_argument("--user-agent", default="PyBuster/1.0", help="User-Agent header")
-    p.add_argument("--output", default=None, help="Findings output file")
-    p.add_argument("--output-format", choices=["text", "jsonl", "csv"], default="text", help="Output format")
-    p.add_argument("--resume-file", default=".pybuster.resume.json", help="Checkpoint file path")
-    p.add_argument("--no-resume", action="store_true", help="Disable reading/writing checkpoint")
-    p.add_argument("--checkpoint-every", type=int, default=2000, help="Save checkpoint every N requests")
-    p.add_argument("--progress-interval", type=float, default=2.0, help="Progress log interval")
-    p.add_argument("--verbose-errors", action="store_true", help="Print request errors")
-    p.add_argument("--wildcard-detect", action="store_true", help="Detect and suppress wildcard responses")
-    p.add_argument("--wildcard-samples", type=int, default=4, help="Random probes for wildcard fingerprinting")
-    p.add_argument("--auto-tune", action="store_true", help="Adapt concurrency/rate from live latency and errors")
-    p.add_argument("--auto-tune-min-concurrency", type=int, default=40, help="Auto-tune floor for active inflight requests")
-    p.add_argument("--auto-tune-min-rate", type=float, default=80.0, help="Auto-tune minimum rps")
-    p.add_argument("--auto-tune-max-rate", type=float, default=120000.0, help="Auto-tune maximum rps")
-    p.add_argument("--auto-tune-interval", type=float, default=2.0, help="Auto-tune loop interval")
-    p.add_argument("--auto-tune-target-error", type=float, default=0.03, help="Target request error rate")
-    p.add_argument("--auto-tune-latency-ms", type=float, default=900.0, help="Latency budget for tuning")
-    p.add_argument("--no-uvloop", action="store_true", help="Disable uvloop install")
-    return p
-
-
 async def run(args: argparse.Namespace) -> int:
+    ensure_aiohttp_available()
     base_url = normalize_base_url(args.url)
     wordlist = Path(args.wordlist)
 
@@ -764,7 +777,8 @@ async def run(args: argparse.Namespace) -> int:
 
     headers = build_default_headers()
     headers.update(parse_headers(args.header))
-    headers.setdefault("User-Agent", args.user_agent)
+    if args.user_agent:
+        headers["User-Agent"] = args.user_agent
 
     allow = parse_statuses(args.status_allow)
     deny = parse_statuses(args.status_deny)
@@ -812,6 +826,23 @@ async def run(args: argparse.Namespace) -> int:
         raise_for_status=False,
         trust_env=True,
     ) as session:
+        if not await check_host_reachable(
+            session=session,
+            base_url=base_url,
+            timeout=args.timeout,
+            method=args.method,
+            follow_redirects=args.follow_redirects,
+        ):
+            print(f"[FATAL] host not reachable: {base_url}", file=sys.stderr)
+            return 2
+
+        user_agent = headers.get("User-Agent", "random (rotating)")
+        print("[RUN] starting scan")
+        print(f"  url          {base_url}")
+        print(f"  concurrency  {args.concurrency}")
+        print(f"  wordlist     {wordlist}")
+        print(f"  useragent    {user_agent}")
+
         wildcard_signatures: Set[str] = set()
         if args.wildcard_detect:
             wildcard_signatures = await detect_wildcard_signatures(
@@ -948,6 +979,9 @@ async def run(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = build_parser()
+    if len(sys.argv) == 1:
+        print_startup_screen(parser)
+        return 0
     args = parser.parse_args()
     try_install_uvloop(args.no_uvloop)
     try:
