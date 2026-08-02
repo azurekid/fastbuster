@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     output.add_argument("--verbose-errors", action="store_true", help="Print request errors")
 
     perf = p.add_argument_group("performance")
-    perf.add_argument("-c", "--concurrency", type=int, default=400, help="Max async workers")
+    perf.add_argument("-c", "--concurrency", type=int, default=40, help="Max async workers")
     perf.add_argument("--rate", type=float, default=0.0, help="Global max requests/sec (0 disables)")
     perf.add_argument("--auto-tune", action="store_true", help="Adapt concurrency/rate from live latency and errors")
     perf.add_argument("--no-uvloop", action="store_true", help="Disable uvloop install")

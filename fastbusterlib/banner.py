@@ -17,7 +17,7 @@ FASTBUSTER_BANNER = dedent(
 STARTER_PARAMETERS = [
     ("url", "http://10.10.10.10:8080"),
     ("wordlist", "wordlist.txt"),
-    ("concurrency", "400"),
+    ("concurrency", "40"),
     ("timeout", "6.0s"),
     ("method", "GET"),
     ("status-allow", "200,204,301-308,401,403"),

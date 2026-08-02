@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Set, Tuple
 
+from fastbusterlib.banner import FASTBUSTER_BANNER
 from fastbusterlib.cli import build_parser, print_startup_screen
 
 try:
@@ -837,6 +838,8 @@ async def run(args: argparse.Namespace) -> int:
             return 2
 
         user_agent = headers.get("User-Agent", "random (rotating)")
+        print(FASTBUSTER_BANNER)
+        print()
         print("[RUN] starting scan")
         print(f"  url          {base_url}")
         print(f"  concurrency  {args.concurrency}")

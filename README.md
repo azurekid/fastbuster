@@ -1,6 +1,6 @@
-# PyBuster
+# FastBuster
 
-PyBuster is a high-speed, wordlist-driven web path scanner inspired by Gobuster/DirBuster patterns.
+FastBuster is a high-speed, wordlist-driven web path scanner inspired by Gobuster/DirBuster patterns.
 
 It is designed for **authorized security testing only**.
 
@@ -205,7 +205,7 @@ python3 fastbuster.py \
 python3 fastbuster.py \
   --url https://example.com \
   --wordlist /path/to/wordlist.txt \
-  --resume-file .pybuster.resume.json
+  --resume-file .FastBuster.resume.json
 ```
 
 If interrupted, rerun with the same command to continue from the last checkpoint.
