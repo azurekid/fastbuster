@@ -1,0 +1,141 @@
+name: Build and Publish APT Repo
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (for example 0.1.1)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-apt-repo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.1.0"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Using version: ${VERSION}"
+
+      - name: Preflight signing secrets
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${APT_GPG_PRIVATE_KEY}" ]; then
+            echo "::error::Missing required repository secret: APT_GPG_PRIVATE_KEY"
+            missing=1
+          fi
+          if [ -z "${APT_GPG_KEY_ID}" ]; then
+            echo "::error::Missing required repository secret: APT_GPG_KEY_ID"
+            missing=1
+          fi
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Build package
+        run: |
+          ./packaging/deb/build-fastbuster-deb.sh "${{ steps.version.outputs.version }}"
+
+      - name: Publish to gh-pages APT repo
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+        run: |
+          set -euo pipefail
+
+          APT_DIR="${RUNNER_TEMP}/apt-repo"
+          mkdir -p "${APT_DIR}"
+
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add "${APT_DIR}" origin/gh-pages
+          else
+            git worktree add -b gh-pages "${APT_DIR}"
+          fi
+
+          cp -f "dist/fastbuster_${VERSION}_all.deb" "${APT_DIR}/"
+
+          pushd "${APT_DIR}" >/dev/null
+          dpkg-scanpackages --multiversion . > Packages
+          gzip -9fk Packages
+
+          apt-ftparchive release . > Release
+
+          if [ -z "${APT_GPG_PRIVATE_KEY}" ] || [ -z "${APT_GPG_KEY_ID}" ]; then
+            echo "Missing required secrets: APT_GPG_PRIVATE_KEY and/or APT_GPG_KEY_ID"
+            exit 1
+          fi
+
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          trap 'rm -rf "${GNUPGHOME}"' EXIT
+
+          echo "${APT_GPG_PRIVATE_KEY}" | gpg --batch --import
+
+          SIGN_ARGS=(--batch --yes --pinentry-mode loopback --default-key "${APT_GPG_KEY_ID}")
+          if [ -n "${APT_GPG_PASSPHRASE}" ]; then
+            SIGN_ARGS+=(--passphrase "${APT_GPG_PASSPHRASE}")
+          fi
+
+          gpg "${SIGN_ARGS[@]}" --clearsign -o InRelease Release
+          gpg "${SIGN_ARGS[@]}" --detach-sign -o Release.gpg Release
+
+          gpg --batch --yes --armor --export "${APT_GPG_KEY_ID}" > fastbuster-archive-keyring.asc
+
+          cat > index.html <<HTML
+          <!doctype html>
+          <html>
+          <head><meta charset="utf-8"><title>fastbuster APT Repo</title></head>
+          <body>
+            <h1>fastbuster APT Repo</h1>
+            <p>Public key: https://azurekid.github.io/fastbuster/fastbuster-archive-keyring.asc</p>
+            <p>Use as source: deb [signed-by=/usr/share/keyrings/fastbuster-archive-keyring.gpg] https://azurekid.github.io/fastbuster ./</p>
+          </body>
+          </html>
+          HTML
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+          git commit -m "Publish fastbuster ${VERSION}"
+          git push origin HEAD:gh-pages
+          popd >/dev/null
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastbuster-deb-${{ steps.version.outputs.version }}
+          path: dist/fastbuster_${{ steps.version.outputs.version }}_all.deb

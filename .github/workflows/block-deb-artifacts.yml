@@ -1,0 +1,39 @@
+name: Block Debian Artifacts
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check-deb-artifacts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail if .deb files are tracked
+        run: |
+          set -euo pipefail
+          deb_files="$(git ls-files '*.deb')"
+          if [ -n "${deb_files}" ]; then
+            echo "Tracked .deb artifacts are not allowed in this repository."
+            echo "Remove them from git tracking with: git rm --cached <file>.deb"
+            echo
+            echo "Found:"
+            echo "${deb_files}"
+            exit 1
+          fi
+
+      - name: Fail if dist contains tracked files
+        run: |
+          set -euo pipefail
+          dist_files="$(git ls-files 'dist/**')"
+          if [ -n "${dist_files}" ]; then
+            echo "Tracked files under dist/ are not allowed in this repository."
+            echo "Remove them from git tracking with: git rm --cached <path>"
+            echo
+            echo "Found:"
+            echo "${dist_files}"
+            exit 1
+          fi

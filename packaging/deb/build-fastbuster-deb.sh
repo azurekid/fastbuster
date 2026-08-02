@@ -30,7 +30,7 @@ cp "${ROOT_DIR}/LICENSE" "${PKG_ROOT}/usr/share/doc/fastbuster/LICENSE"
 
 cat > "${PKG_ROOT}/usr/bin/fastbuster" <<'EOF'
 #!/usr/bin/env bash
-exec python3 /usr/lib/fastbuster/fastbuster.py "$@"
+exec /usr/bin/python3 /usr/lib/fastbuster/fastbuster.py "$@"
 EOF
 chmod 0755 "${PKG_ROOT}/usr/bin/fastbuster"
 chmod 0755 "${PKG_ROOT}/usr/lib/fastbuster/fastbuster.py"

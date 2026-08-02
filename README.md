@@ -28,6 +28,45 @@ It is designed for **authorized security testing only**.
 
 ## Install
 
+### Recommended: GitHub-hosted APT repo (one-time setup)
+
+If releases are published with the GitHub Actions workflow in this repo, users can install with APT
+without cloning this project.
+
+One-time setup:
+
+```bash
+curl -fsSL https://azurekid.github.io/fastbuster/fastbuster-archive-keyring.asc \
+  | gpg --dearmor \
+  | sudo tee /usr/share/keyrings/fastbuster-archive-keyring.gpg >/dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/fastbuster-archive-keyring.gpg] https://azurekid.github.io/fastbuster ./" \
+  | sudo tee /etc/apt/sources.list.d/fastbuster.list
+sudo apt update
+```
+
+Install and run:
+
+```bash
+sudo apt install -y fastbuster
+fastbuster --help
+```
+
+After the source is added once, updates are just:
+
+```bash
+sudo apt update
+sudo apt install -y fastbuster
+```
+
+### Maintainers: required GitHub Actions secrets for signed repo publishing
+
+Set these repository secrets before running `.github/workflows/publish-apt-repo.yml`:
+
+- `APT_GPG_PRIVATE_KEY`: ASCII-armored private key used to sign `Release` metadata.
+- `APT_GPG_KEY_ID`: key ID or fingerprint of the signing key.
+- `APT_GPG_PASSPHRASE`: passphrase for the private key (optional if key has no passphrase).
+
 ### Kali/Debian: install via APT package name (`fastbuster`)
 
 `fastbuster` is not in the default Debian/Kali repos yet, so this repo includes packaging scripts
@@ -35,7 +74,7 @@ to create a local APT repo and install it by package name.
 
 ```bash
 sudo apt update
-sudo apt install -y dpkg-dev python3 python3-aiohttp python3-uvloop
+sudo apt install -y dpkg-dev
 
 # from this repo root
 ./packaging/deb/setup-local-apt-repo.sh 0.1.0
@@ -44,9 +83,40 @@ sudo apt install -y dpkg-dev python3 python3-aiohttp python3-uvloop
 sudo apt install -y fastbuster
 ```
 
+The package metadata declares `python3-aiohttp` and `python3-uvloop` as dependencies,
+so APT installs them automatically when you install `fastbuster`.
+
 Run it directly after install:
 
 ```bash
+fastbuster --help
+```
+
+### Troubleshooting local .deb install
+
+If you install with a local file path (for example `sudo apt install ./fastbuster_0.1.0_all.deb`) and see:
+"Download is performed unsandboxed as root ... couldn't be accessed by user _apt"
+
+this is usually harmless. APT falls back to root when `_apt` cannot read that path.
+To avoid the warning, install from a world-readable path:
+
+```bash
+cp ./dist/fastbuster_0.1.0_all.deb /tmp/
+sudo apt install -y /tmp/fastbuster_0.1.0_all.deb
+```
+
+If `fastbuster` fails with `ModuleNotFoundError: No module named 'aiohttp'`:
+
+```bash
+sudo apt update
+sudo apt install -y python3-aiohttp python3-uvloop
+sudo apt install -y --reinstall fastbuster
+```
+
+Then verify:
+
+```bash
+/usr/bin/python3 -c "import aiohttp,uvloop; print('ok')"
 fastbuster --help
 ```
 
