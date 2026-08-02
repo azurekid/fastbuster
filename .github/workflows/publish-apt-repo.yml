@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install packaging tools
         run: |
@@ -135,7 +135,7 @@ jobs:
           popd >/dev/null
 
       - name: Upload deb artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: fastbuster-deb-${{ steps.version.outputs.version }}
           path: dist/fastbuster_${{ steps.version.outputs.version }}_all.deb
