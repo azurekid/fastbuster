@@ -125,7 +125,20 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
+
+          # Main branch ignores *.deb, so force-add APT artifacts on gh-pages.
+          git add -f \
+            fastbuster_*.deb \
+            Packages \
+            Packages.gz \
+            Release \
+            InRelease \
+            Release.gpg \
+            fastbuster-archive-keyring.asc \
+            index.html
+
+          # Stage removals too (for old package versions no longer present).
+          git add -u
           if git diff --cached --quiet; then
             echo "No changes to publish"
             exit 0

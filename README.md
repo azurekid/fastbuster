@@ -52,6 +52,20 @@ sudo apt install -y fastbuster
 fastbuster --help
 ```
 
+If key import fails with `404` or `gpg: no valid OpenPGP data found`, verify the key URL first:
+
+```bash
+curl -fI https://azurekid.github.io/fastbuster/fastbuster-archive-keyring.asc
+```
+
+If that returns `404`, the signed APT repo is not published yet. For maintainers, check:
+
+- GitHub Pages source is set to `gh-pages` branch.
+- `.github/workflows/publish-apt-repo.yml` completed successfully.
+- Required repository secrets are set (`APT_GPG_PRIVATE_KEY`, `APT_GPG_KEY_ID`, optional `APT_GPG_PASSPHRASE`).
+
+As a temporary fallback, use the local repo flow in the next section (`setup-local-apt-repo.sh`).
+
 After the source is added once, updates are just:
 
 ```bash
