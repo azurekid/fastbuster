@@ -15,3 +15,20 @@ Description: High-speed wordlist-driven web path scanner
  It supports large wordlists, response filters, output formats, resume checkpoints,
  wildcard detection, and adaptive auto-tuning.
 
+Package: fastbuster
+Version: 0.1.2
+Architecture: all
+Maintainer: fastbuster maintainers
+Depends: python3, python3-aiohttp, python3-uvloop, python3-argcomplete
+Filename: ./fastbuster_0.1.2_all.deb
+Size: 28602
+MD5sum: e177ef9582fbe2c5dbb793804c7999d7
+SHA1: 28d145f6944111c135d3e037111e094d768ea72a
+SHA256: 29b3f9e1bb32d01bd8f5bf42b7c695f07e19aa4b4f607a7a47b64030d5e8d6ae
+Section: net
+Priority: optional
+Description: High-speed wordlist-driven web path scanner
+ FastBuster is an async, high-concurrency web path scanner for authorized security testing.
+ It supports large wordlists, response filters, output formats, resume checkpoints,
+ wildcard detection, and adaptive auto-tuning.
+
