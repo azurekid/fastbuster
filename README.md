@@ -28,6 +28,30 @@ It is designed for **authorized security testing only**.
 
 ## Install
 
+### Kali/Debian: install via APT package name (`fastbuster`)
+
+`fastbuster` is not in the default Debian/Kali repos yet, so this repo includes packaging scripts
+to create a local APT repo and install it by package name.
+
+```bash
+sudo apt update
+sudo apt install -y dpkg-dev python3 python3-aiohttp python3-uvloop
+
+# from this repo root
+./packaging/deb/setup-local-apt-repo.sh 0.1.0
+
+# now installs by package name
+sudo apt install -y fastbuster
+```
+
+Run it directly after install:
+
+```bash
+fastbuster --help
+```
+
+### Python virtualenv install (development)
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
